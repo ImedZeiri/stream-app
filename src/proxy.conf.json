@@ -1,0 +1,13 @@
+{
+    "/stream": {
+      "target": "https://cric365.site",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug",
+      "headers": {
+        "Origin": "https://cric365.site",
+        "Host": "cric365.site"
+      }
+    }
+  }
+  
