@@ -6,7 +6,7 @@
       "logLevel": "debug",
       "headers": {
         "Origin": "https://cric365.site",
-        "Host": "cric365.site"
+        "Host": "https://cric365.site/"
       }
     }
   }
