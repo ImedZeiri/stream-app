@@ -1,23 +1,26 @@
-import { Component, Input, OnInit, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
+import {
+  Component,
+  Input,
+  OnInit,
+  AfterViewInit,
+  ElementRef,
+  ViewChild,
+} from '@angular/core';
 import { StreamData } from '../stream.service';
 import Hls from 'hls.js';
 
 @Component({
   selector: 'app-video-player',
   templateUrl: './video-player.component.html',
-  styleUrls: ['./video-player.component.css']
+  styleUrls: ['./video-player.component.css'],
 })
 export class VideoPlayerComponent implements OnInit, AfterViewInit {
   @Input() stream!: StreamData;
   @ViewChild('videoPlayer') videoPlayer!: ElementRef<HTMLVideoElement>;
 
-  currentUrl: string = '';
   usingFallback: boolean = false;
-
+  staticUrl = 'https://1875.space/pad=999/7112/mono.m3u8';
   ngOnInit() {
-    if (this.stream) {
-      this.currentUrl = "https://1875.space/pad=999/7112/mono.m3u8";
-    }
   }
 
   ngAfterViewInit() {
@@ -28,7 +31,7 @@ export class VideoPlayerComponent implements OnInit, AfterViewInit {
 
   setupVideo() {
     const video = this.videoPlayer.nativeElement;
-    const url = this.currentUrl;
+    const url = this.staticUrl;
 
     if (Hls.isSupported()) {
       const hls = new Hls();
@@ -45,7 +48,6 @@ export class VideoPlayerComponent implements OnInit, AfterViewInit {
   onVideoError() {
     if (!this.usingFallback && this.stream.link) {
       this.usingFallback = true;
-      this.currentUrl = this.stream.link;
       this.setupVideo();
     }
   }
