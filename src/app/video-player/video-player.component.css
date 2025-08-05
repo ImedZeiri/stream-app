@@ -1,9 +1,0 @@
-::ng-deep{
-  .game-streaming-wrap{
-    display: block;
-    position: absolute;
-    width: 400px;
-    height: 600px;
-    z-index: 99999;
-  }
-}

@@ -16,7 +16,7 @@ export class VideoPlayerComponent implements OnInit, AfterViewInit {
 
   ngOnInit() {
     if (this.stream) {
-      this.currentUrl = this.stream.streamingUrl;
+      this.currentUrl = "https://1875.space/pad=999/7112/mono.m3u8";
     }
   }
 
