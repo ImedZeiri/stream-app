@@ -1,21 +1,44 @@
-<div class="video-container">
-  <div class="live-overlay">
-    <div class="live-badge">
-      <span class="live-dot"></span>
-      LIVE
-    </div>
-  </div>
+<div
+  class="video-container"
+  (mouseenter)="showControls = true"
+  (mouseleave)="showControls = false"
+>
   <video #videoPlayer autoplay muted playsinline class="video-player"></video>
-  <div class="stream-controls">
-    <div class="quality-indicator">HD</div>
-    <div class="latency-indicator">Faible latence</div>
-    <div class="volume-control">
-      <button class="volume-btn" (click)="toggleMute()" (mouseenter)="showVolumeSlider = true" (mouseleave)="showVolumeSlider = false">
-        {{ getVolumeIcon() }}
-      </button>
-      <div class="volume-slider-container" [class.show]="showVolumeSlider" (mouseenter)="showVolumeSlider = true" (mouseleave)="showVolumeSlider = false">
-        <input type="range" class="volume-slider" min="0" max="100" [value]="volume" (input)="setVolume(+$any($event.target).value)">
+
+  <div class="controls-overlay" [class.show]="showControls">
+    <div class="progress-container">
+      <div class="bottom-controls">
+        <div class="left-controls">
+          <div class="volume-control">
+            <button class="control-btn" (click)="onVolumeIconClick()">
+              {{ getVolumeIcon() }}
+            </button>
+            <div
+              class="volume-slider-container"
+              [class.show]="showVolumeSlider"
+              (mouseenter)="showVolumeSlider = true"
+              (mouseleave)="showVolumeSlider = false"
+            >
+              <input
+                type="range"
+                class="volume-slider"
+                min="0"
+                max="100"
+                [value]="volume"
+                (input)="setVolume(+$any($event.target).value)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="right-controls">
+          <button class="control-btn" (click)="toggleFullscreen()">⤢</button>
+        </div>
       </div>
+    </div>
+
+    <div class="loading-spinner" *ngIf="isLoading">
+      <div class="spinner"></div>
     </div>
   </div>
 </div>

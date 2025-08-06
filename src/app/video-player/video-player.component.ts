@@ -6,157 +6,184 @@ import {
   AfterViewInit,
   ElementRef,
   ViewChild,
+  HostListener,
 } from '@angular/core';
-import { StreamData } from '../stream.service';
 import Hls from 'hls.js';
+import { StreamData } from '../stream.service';
 
 @Component({
   selector: 'app-video-player',
   templateUrl: './video-player.component.html',
-  styleUrls: ['./video-player.component.css'],
+  styleUrls: ['./video-player.component.css']
 })
 export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
-  @Input() stream!: StreamData;
+  @Input() streamUrl!: StreamData;
   @ViewChild('videoPlayer') videoPlayer!: ElementRef<HTMLVideoElement>;
 
-  usingFallback: boolean = false;
-  staticUrl = 'https://1875.space/pad=999/7104/mono.m3u8';
+  // Player state
+  isPlaying: boolean = false;
+  isLoading: boolean = true;
+  hasError: boolean = false;
+  showControls: boolean = false;
+  showVolumeSlider: boolean = false;
+  isFullscreen: boolean = false;
   isLive: boolean = true;
-  streamStartTime: Date = new Date();
-  currentTime: string = '00:00';
+  
+  // Progress
+  playProgress: number = 0;
+  bufferProgress: number = 0;
+  
   volume: number = 100;
   isMuted: boolean = false;
-  showVolumeSlider: boolean = false;
+  
+  currentTime: string = '00:00';
+  streamStartTime: Date = new Date();
   
   private hls: Hls | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
+  private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
-  private bufferCheckInterval: any;
+  private controlsHideTimeout: any;
+  private progressUpdateInterval: any;
   
-  bufferConfig = {
-    maxBufferLength: 60,
-    maxMaxBufferLength: 120,
-    liveSyncDurationCount: 2,
-    liveMaxLatencyDurationCount: 6,
-    maxBufferHole: 0.5,
-    manifestLoadingTimeOut: 10000,
-    manifestLoadingMaxRetry: 6,
-    levelLoadingTimeOut: 10000,
-    levelLoadingMaxRetry: 6,
-    fragLoadingTimeOut: 20000,
-    fragLoadingMaxRetry: 6,
-    audioStream: true,
-    defaultAudioCodec: 'mp4a.40.2',
-    stretchShortVideoTrack: false,
-    forceKeyFrameOnDiscontinuity: true
-  };
-
   ngOnInit() {
+    this.isLoading = true;
     this.updateStreamTimer();
   }
 
   ngAfterViewInit() {
-    if (this.stream) {
-      this.setupVideo();
-    }
+    this.setupVideo();
+    this.setupEventListeners();
+    this.setVolume(100); // Initialiser avec volume à 100%
   }
 
-  setupVideo() {
+  ngOnDestroy() {
+    this.cleanup();
+  }
+
+  private setupVideo() {
     const video = this.videoPlayer.nativeElement;
-    const url = this.staticUrl;
+    const url = this.streamUrl.link;
 
     video.setAttribute('playsinline', 'true');
     video.setAttribute('webkit-playsinline', 'true');
-    video.muted = false;
-    video.volume = 1.0;
     
     if (Hls.isSupported()) {
-      this.initializeHls(video, url);
+      this.isLoading = false;
+      this.setupHls(video, url);
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
-      video.play().catch(() => this.handlePlaybackError());
+      this.setupNativeHls(video, url);
     } else {
-      this.onVideoError();
+      this.handleUnsupportedBrowser();
     }
-    
-    this.startBufferMonitoring();
   }
 
-  private initializeHls(video: HTMLVideoElement, url: string) {
-    if (this.hls) {
-      this.hls.destroy();
-    }
-
+  private setupHls(video: HTMLVideoElement, url: string) {
     this.hls = new Hls({
-      ...this.bufferConfig,
+      maxBufferLength: 30,
+      maxMaxBufferLength: 60,
+      liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: 6,
       enableWorker: true,
       lowLatencyMode: true,
-      backBufferLength: 10,
-      progressive: false,
-      startFragPrefetch: true,
-      abrEwmaDefaultEstimate: 500000,
-      fragLoadingRetryDelay: 1000,
-      fragLoadingMaxRetryTimeout: 64000
     });
 
     this.hls.loadSource(url);
     this.hls.attachMedia(video);
-    
-    this.setupHlsEventHandlers(video);
-  }
-
-  private setupHlsEventHandlers(video: HTMLVideoElement) {
-    if (!this.hls) return;
 
     this.hls.on(Hls.Events.MANIFEST_LOADED, () => {
-      this.reconnectAttempts = 0;
-      video.muted = true;
-      video.play()
-        .then(() => {
-          setTimeout(() => {
-            video.muted = false;
-          }, 1000);
-        })
-        .catch(() => this.handlePlaybackError());
+      this.isLoading = false;
+      this.hasError = false;
+      video.play().catch(e => this.handlePlaybackError(e));
     });
 
     this.hls.on(Hls.Events.ERROR, (event, data) => {
-      this.handleHlsError(data, video);
-    });
-
-    this.hls.on(Hls.Events.BUFFER_APPENDED, () => {
-      if (video.paused && video.readyState >= 3) {
-        video.play().catch(() => this.handlePlaybackError());
-      }
-    });
-
-    this.hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
-      if (this.hls && this.hls.audioTracks.length > 0) {
-        this.hls.audioTrack = 0;
+      if (data.fatal) {
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            this.handleNetworkError();
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            this.handleMediaError();
+            break;
+          default:
+            this.reconnectStream();
+            break;
+        }
       }
     });
 
     this.hls.on(Hls.Events.FRAG_BUFFERED, () => {
       if (video.paused && video.readyState >= 3) {
-        video.play().catch(() => this.handlePlaybackError());
+        video.play().catch(e => this.handlePlaybackError(e));
       }
     });
   }
 
-  private handleHlsError(data: any, video: HTMLVideoElement) {
-    if (data.fatal) {
-      switch (data.type) {
-        case Hls.ErrorTypes.NETWORK_ERROR:
-          this.handleNetworkError();
-          break;
-        case Hls.ErrorTypes.MEDIA_ERROR:
-          this.handleMediaError();
-          break;
-        default:
-          this.reconnectStream();
-          break;
+  private setupNativeHls(video: HTMLVideoElement, url: string) {
+    video.src = url;
+    video.addEventListener('loadedmetadata', () => {
+      this.isLoading = false;
+      this.hasError = false;
+      video.play().catch(e => this.handlePlaybackError(e));
+    });
+    
+    video.addEventListener('error', () => {
+      this.handlePlaybackError(new Error('Native HLS playback error'));
+    });
+  }
+
+  private handleUnsupportedBrowser() {
+    this.hasError = true;
+    this.isLoading = false;
+    console.error('HLS is not supported in this browser');
+  }
+
+  private setupEventListeners() {
+    const video = this.videoPlayer.nativeElement;
+    
+    video.addEventListener('play', () => {
+      this.isPlaying = true;
+      this.startProgressUpdates();
+    });
+    
+    video.addEventListener('pause', () => {
+      this.isPlaying = false;
+      this.stopProgressUpdates();
+    });
+    
+    video.addEventListener('waiting', () => {
+      this.isLoading = true;
+    });
+    
+    video.addEventListener('playing', () => {
+      this.isLoading = false;
+    });
+    
+    video.addEventListener('volumechange', () => {
+      this.volume = video.muted ? 0 : Math.round(video.volume * 100);
+      this.isMuted = video.muted;
+    });
+  }
+
+  private startProgressUpdates() {
+    this.progressUpdateInterval = setInterval(() => {
+      const video = this.videoPlayer.nativeElement;
+      if (video.buffered.length > 0) {
+        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+        const duration = Math.max(video.duration, bufferedEnd);
+        this.bufferProgress = (bufferedEnd / duration) * 100;
+        
+        if (!this.isLive) {
+          this.playProgress = (video.currentTime / duration) * 100;
+        }
       }
+    }, 500);
+  }
+
+  private stopProgressUpdates() {
+    if (this.progressUpdateInterval) {
+      clearInterval(this.progressUpdateInterval);
     }
   }
 
@@ -175,106 +202,160 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
     this.hls?.recoverMediaError();
   }
 
-  private reconnectStream() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      setTimeout(() => {
-        this.setupVideo();
-      }, this.reconnectDelay * this.reconnectAttempts);
-    }
+  reconnectStream() {
+    this.isLoading = true;
+    this.hasError = false;
+    this.reconnectAttempts = 0;
+    this.cleanup();
+    this.setupVideo();
   }
 
-  private handlePlaybackError() {
+  private handlePlaybackError(error: any) {
+    console.error('Playback error:', error);
+    this.isLoading = false;
+    this.hasError = true;
+    this.isPlaying = false;
+  }
+
+  togglePlay() {
     const video = this.videoPlayer.nativeElement;
-    if (video.error) {
-      video.muted = true;
-      setTimeout(() => {
-        video.muted = false;
-        this.reconnectStream();
-      }, 1000);
-    }
-  }
-
-  private startBufferMonitoring() {
-    this.bufferCheckInterval = setInterval(() => {
-      const video = this.videoPlayer.nativeElement;
-      if (video && video.buffered.length > 0) {
-        const bufferEnd = video.buffered.end(video.buffered.length - 1);
-        const currentTime = video.currentTime;
-        const bufferHealth = bufferEnd - currentTime;
-        
-        if (bufferHealth < 2 && !video.paused) {
-          this.adjustBufferSettings(true);
-        } else if (bufferHealth > 10) {
-          this.adjustBufferSettings(false);
-        }
-        
-        if (video.paused && bufferHealth > 3) {
-          video.play().catch(() => this.handlePlaybackError());
-        }
-      }
-    }, 1000);
-  }
-
-  private adjustBufferSettings(increase: boolean) {
-    if (!this.hls) return;
-    
-    if (increase) {
-      this.bufferConfig.maxBufferLength = Math.min(120, this.bufferConfig.maxBufferLength + 10);
+    if (video.paused) {
+      video.play().catch(e => this.handlePlaybackError(e));
     } else {
-      this.bufferConfig.maxBufferLength = Math.max(30, this.bufferConfig.maxBufferLength - 5);
+      video.pause();
     }
+    this.resetControlsHideTimeout();
   }
 
-  onVideoError() {
-    if (!this.usingFallback && this.stream.link) {
-      this.usingFallback = true;
-      this.setupVideo();
-    } else {
-      this.reconnectStream();
+  onVolumeIconClick() {
+    this.showVolumeSlider = !this.showVolumeSlider;
+    if (!this.showVolumeSlider) {
+      this.toggleMute();
     }
-  }
-
-  ngOnDestroy() {
-    if (this.hls) {
-      this.hls.destroy();
-    }
-    if (this.bufferCheckInterval) {
-      clearInterval(this.bufferCheckInterval);
-    }
-  }
-
-  updateStreamTimer() {
-    setInterval(() => {
-      const now = new Date();
-      const diff = now.getTime() - this.streamStartTime.getTime();
-      const minutes = Math.floor(diff / 60000);
-      const seconds = Math.floor((diff % 60000) / 1000);
-      this.currentTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }, 1000);
+    this.resetControlsHideTimeout();
   }
 
   toggleMute() {
     const video = this.videoPlayer.nativeElement;
-    this.isMuted = !this.isMuted;
-    video.muted = this.isMuted;
+    if (video.volume === 0 && !video.muted) {
+      // Cas spécial où volume est à 0 mais pas muted
+      video.volume = 1;
+      video.muted = false;
+    } else {
+      video.muted = !video.muted;
+    }
+    // Mettre à jour l'état local
+    this.isMuted = video.muted;
+    this.volume = video.muted ? 0 : Math.round(video.volume * 100);
+    this.resetControlsHideTimeout();
   }
 
   setVolume(value: number) {
     const video = this.videoPlayer.nativeElement;
     this.volume = value;
     video.volume = value / 100;
-    this.isMuted = value === 0;
-    video.muted = this.isMuted;
+    // Si le volume est > 0, on désactive le mute
+    if (value > 0) {
+      video.muted = false;
+      this.isMuted = false;
+    } else {
+      // Si volume = 0, on active le mute
+      video.muted = true;
+      this.isMuted = true;
+    }
+    this.resetControlsHideTimeout();
   }
 
   toggleVolumeSlider() {
     this.showVolumeSlider = !this.showVolumeSlider;
+    this.resetControlsHideTimeout();
   }
 
   getVolumeIcon(): string {
     if (this.isMuted || this.volume === 0) return '🔇';
     if (this.volume < 50) return '🔉';
     return '🔊';
+  }
+
+  toggleFullscreen() {
+    const videoContainer = this.videoPlayer.nativeElement.parentElement;
+    if (!videoContainer) return;
+
+    if (!document.fullscreenElement) {
+      videoContainer.requestFullscreen().catch(err => {
+        console.error('Error attempting to enable fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+    this.resetControlsHideTimeout();
+  }
+
+  updateStreamTimer() {
+    setInterval(() => {
+      const now = new Date();
+      const diff = now.getTime() - this.streamStartTime.getTime();
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      
+      if (hours > 0) {
+        this.currentTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      } else {
+        this.currentTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }
+    }, 1000);
+  }
+
+  private resetControlsHideTimeout() {
+    if (this.controlsHideTimeout) {
+      clearTimeout(this.controlsHideTimeout);
+    }
+    this.showControls = true;
+    this.controlsHideTimeout = setTimeout(() => {
+      this.showControls = false;
+      this.showVolumeSlider = false;
+    }, 3000);
+  }
+
+  @HostListener('document:keydown.space', ['$event'])
+  handleSpaceKey(event: Event) {
+    event.preventDefault();
+    this.togglePlay();
+  }
+
+  @HostListener('document:keydown.f', ['$event'])
+  handleFKey(event: Event) {
+    event.preventDefault();
+    this.toggleFullscreen();
+  }
+
+  @HostListener('document:keydown.m', ['$event'])
+  handleMKey(event: Event) {
+    event.preventDefault();
+    this.toggleMute();
+  }
+
+  @HostListener('document:fullscreenchange')
+  handleFullscreenChange() {
+    this.isFullscreen = !!document.fullscreenElement;
+  }
+
+  private cleanup() {
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+    
+    this.stopProgressUpdates();
+    
+    if (this.controlsHideTimeout) {
+      clearTimeout(this.controlsHideTimeout);
+    }
+    
+    const video = this.videoPlayer.nativeElement;
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
   }
 }
