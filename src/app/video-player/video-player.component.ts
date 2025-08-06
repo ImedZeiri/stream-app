@@ -24,6 +24,9 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
   isLive: boolean = true;
   streamStartTime: Date = new Date();
   currentTime: string = '00:00';
+  volume: number = 100;
+  isMuted: boolean = false;
+  showVolumeSlider: boolean = false;
   
   private hls: Hls | null = null;
   private reconnectAttempts = 0;
@@ -249,5 +252,29 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
       const seconds = Math.floor((diff % 60000) / 1000);
       this.currentTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }, 1000);
+  }
+
+  toggleMute() {
+    const video = this.videoPlayer.nativeElement;
+    this.isMuted = !this.isMuted;
+    video.muted = this.isMuted;
+  }
+
+  setVolume(value: number) {
+    const video = this.videoPlayer.nativeElement;
+    this.volume = value;
+    video.volume = value / 100;
+    this.isMuted = value === 0;
+    video.muted = this.isMuted;
+  }
+
+  toggleVolumeSlider() {
+    this.showVolumeSlider = !this.showVolumeSlider;
+  }
+
+  getVolumeIcon(): string {
+    if (this.isMuted || this.volume === 0) return '🔇';
+    if (this.volume < 50) return '🔉';
+    return '🔊';
   }
 }
