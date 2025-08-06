@@ -19,7 +19,7 @@ export class VideoPlayerComponent implements OnInit, AfterViewInit {
   @ViewChild('videoPlayer') videoPlayer!: ElementRef<HTMLVideoElement>;
 
   usingFallback: boolean = false;
-  staticUrl = 'https://1875.space/pad=999/350/mono.m3u8';
+  staticUrl = 'https://1875.space/pad=999/7104/mono.m3u8';
   ngOnInit() {
   }
 
