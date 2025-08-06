@@ -33,8 +33,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
   playProgress: number = 0;
   bufferProgress: number = 0;
   
-  volume: number = 100;
-  isMuted: boolean = false;
+  volume: number = 0;
+  isMuted: boolean = true;
   
   currentTime: string = '00:00';
   streamStartTime: Date = new Date();
@@ -54,7 +54,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
   ngAfterViewInit() {
     this.setupVideo();
     this.setupEventListeners();
-    this.setVolume(100); // Initialiser avec volume à 100%
+    this.setVolume(0); // Initialiser avec son coupé
   }
 
   ngOnDestroy() {
@@ -94,6 +94,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
     this.hls.on(Hls.Events.MANIFEST_LOADED, () => {
       this.isLoading = false;
       this.hasError = false;
+      video.muted = true;
       video.play().catch(e => this.handlePlaybackError(e));
     });
 
@@ -125,6 +126,7 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
     video.addEventListener('loadedmetadata', () => {
       this.isLoading = false;
       this.hasError = false;
+      video.muted = true;
       video.play().catch(e => this.handlePlaybackError(e));
     });
     
