@@ -42,8 +42,13 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
     levelLoadingTimeOut: 10000,
     levelLoadingMaxRetry: 6,
     fragLoadingTimeOut: 20000,
-    fragLoadingMaxRetry: 6
+    fragLoadingMaxRetry: 6,
+    audioStream: true,
+    defaultAudioCodec: 'mp4a.40.2',
+    stretchShortVideoTrack: false,
+    forceKeyFrameOnDiscontinuity: true
   };
+
   ngOnInit() {
     this.updateStreamTimer();
   }
@@ -60,6 +65,8 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
 
     video.setAttribute('playsinline', 'true');
     video.setAttribute('webkit-playsinline', 'true');
+    video.muted = false;
+    video.volume = 1.0;
     
     if (Hls.isSupported()) {
       this.initializeHls(video, url);
@@ -82,9 +89,12 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
       ...this.bufferConfig,
       enableWorker: true,
       lowLatencyMode: true,
-      backBufferLength: 30,
+      backBufferLength: 10,
       progressive: false,
-      startFragPrefetch: true
+      startFragPrefetch: true,
+      abrEwmaDefaultEstimate: 500000,
+      fragLoadingRetryDelay: 1000,
+      fragLoadingMaxRetryTimeout: 64000
     });
 
     this.hls.loadSource(url);
@@ -98,7 +108,14 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.hls.on(Hls.Events.MANIFEST_LOADED, () => {
       this.reconnectAttempts = 0;
-      video.play().catch(() => this.handlePlaybackError());
+      video.muted = true;
+      video.play()
+        .then(() => {
+          setTimeout(() => {
+            video.muted = false;
+          }, 1000);
+        })
+        .catch(() => this.handlePlaybackError());
     });
 
     this.hls.on(Hls.Events.ERROR, (event, data) => {
@@ -106,6 +123,18 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
     });
 
     this.hls.on(Hls.Events.BUFFER_APPENDED, () => {
+      if (video.paused && video.readyState >= 3) {
+        video.play().catch(() => this.handlePlaybackError());
+      }
+    });
+
+    this.hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+      if (this.hls && this.hls.audioTracks.length > 0) {
+        this.hls.audioTrack = 0;
+      }
+    });
+
+    this.hls.on(Hls.Events.FRAG_BUFFERED, () => {
       if (video.paused && video.readyState >= 3) {
         video.play().catch(() => this.handlePlaybackError());
       }
@@ -155,7 +184,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
   private handlePlaybackError() {
     const video = this.videoPlayer.nativeElement;
     if (video.error) {
-      this.reconnectStream();
+      video.muted = true;
+      setTimeout(() => {
+        video.muted = false;
+        this.reconnectStream();
+      }, 1000);
     }
   }
 
@@ -217,6 +250,4 @@ export class VideoPlayerComponent implements OnInit, OnDestroy, AfterViewInit {
       this.currentTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }, 1000);
   }
-
-
 }
