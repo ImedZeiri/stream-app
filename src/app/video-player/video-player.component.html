@@ -1,4 +1,13 @@
 <div class="video-container">
-  <div class="live-badge">LIVE</div>
-  <video #videoPlayer controls autoplay muted class="video-player"></video>
+  <div class="live-overlay">
+    <div class="live-badge">
+      <span class="live-dot"></span>
+      LIVE
+    </div>
+  </div>
+  <video #videoPlayer autoplay muted playsinline class="video-player"></video>
+  <div class="stream-controls">
+    <div class="quality-indicator">HD</div>
+    <div class="latency-indicator">Faible latence</div>
+  </div>
 </div>

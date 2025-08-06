@@ -1,27 +1,169 @@
 .video-container {
   position: relative;
   width: 100%;
-  max-width: 800px;
-  border: 2px solid red;
-  border-radius: 10px;
+  max-width: 900px;
+  border: 2px solid #ff0000;
+  border-radius: 16px;
   overflow: hidden;
-  background-color: black;
+  background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+  box-shadow: 
+    0 0 30px rgba(255, 0, 0, 0.4),
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.video-container:hover {
+  border-color: #ff3333;
+  box-shadow: 
+    0 0 40px rgba(255, 0, 0, 0.6),
+    0 12px 40px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
 }
 
 .video-player {
   width: 100%;
   height: auto;
   display: block;
+  background-color: #000;
+}
+
+.live-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 50%, transparent 100%);
+  backdrop-filter: blur(2px);
 }
 
 .live-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background-color: red;
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #ff0000 0%, #ff3333 50%, #ff0000 100%);
   color: white;
-  padding: 4px 10px;
-  font-weight: bold;
-  font-size: 12px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  font-weight: 900;
+  font-size: 14px;
+  border-radius: 25px;
+  box-shadow: 
+    0 4px 15px rgba(255, 0, 0, 0.5),
+    0 0 0 2px rgba(255, 255, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  animation: pulse 2s infinite;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.5px;
+}
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(circle, #ffffff 0%, #ffcccc 100%);
+  border-radius: 50%;
+  margin-right: 8px;
+  animation: blink 1.5s infinite;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+.stream-duration {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(20, 20, 20, 0.9) 100%);
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  letter-spacing: 1px;
+}
+
+.stream-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  gap: 10px;
+  z-index: 10;
+}
+
+.quality-indicator,
+.latency-indicator {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(20, 20, 20, 0.95) 100%);
+  color: #00ff88;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid #00ff88;
+  backdrop-filter: blur(4px);
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 255, 136, 0.2);
+  letter-spacing: 0.5px;
+}
+
+.latency-indicator {
+  color: #ffaa00;
+  border-color: #ffaa00;
+  text-shadow: 0 0 8px rgba(255, 170, 0, 0.6);
+  box-shadow: 0 2px 8px rgba(255, 170, 0, 0.2);
+}
+
+@keyframes pulse {
+  0% { 
+    box-shadow: 
+      0 4px 15px rgba(255, 0, 0, 0.5),
+      0 0 0 2px rgba(255, 255, 255, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 
+      0 6px 25px rgba(255, 0, 0, 0.8),
+      0 0 0 3px rgba(255, 255, 255, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transform: scale(1.02);
+  }
+  100% { 
+    box-shadow: 
+      0 4px 15px rgba(255, 0, 0, 0.5),
+      0 0 0 2px rgba(255, 255, 255, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transform: scale(1);
+  }
+}
+
+@keyframes blink {
+  0%, 60% { 
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+  }
+  61%, 100% { 
+    opacity: 0.2;
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+  }
+}
+
+.video-container:hover .live-overlay {
+  opacity: 1;
+  background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, transparent 100%);
+}
+
+.video-container .live-overlay {
+  transition: all 0.3s ease;
+}
+
+.video-player {
+  transition: all 0.3s ease;
+}
+
+.video-container:hover .video-player {
+  filter: brightness(1.05) contrast(1.02);
 }
